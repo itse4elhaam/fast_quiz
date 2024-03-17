@@ -26,27 +26,48 @@ def get_db():
 
 db_dependency = Annotated[Session, Depends(get_db)]
 
+@app.get("/questions/{question_id}")
+async def read_question(question_id: int, db:db_dependency):
+    try:
+        found_question = db.query(models.Questions).filter(models.Questions.id == question_id).first()
+        if(not found_question):
+            raise HTTPException(status_code=404, detail="Question not found")
+        return found_question
+        
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/choices/{question_id}")
+async def read_choice(question_id: int, db:db_dependency):
+    try:
+        found_choice = db.query(models.Choices).filter(models.Choices.question_id == question_id).all()
+        if(not found_choice):
+            raise HTTPException(status_code=404, detail="choice not found")
+        return found_choice
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/questions/")
 async def create_questions(question: QuestionBase, db: db_dependency):
     try:
-        # Create the question
         db_question = models.Questions(question_text=question.question_text)
         db.add(db_question)
         db.commit()
         db.refresh(db_question)
         
-        # Create choices for the question
         for choice in question.choices:
             db_choice = models.Choices(
                 choice_text=choice.choice_text,
                 is_correct=choice.is_correct,
-                question_id=db_question.id  # Use db_question.id after committing
+                question_id=db_question.id  
             )
             db.add(db_choice)
 
-        db.commit()  # Commit once after all changes
+        db.commit()  
         return {"message": "Question created successfully"}
     except Exception as e:
         print(e)
-        db.rollback()  # Rollback changes if an error occurs
+        db.rollback()  
         raise HTTPException(status_code=500, detail=str(e))
